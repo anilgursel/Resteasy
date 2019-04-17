@@ -2,6 +2,7 @@ package org.jboss.resteasy.client.jaxrs.internal;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 
 import javax.ws.rs.HttpMethod;
@@ -20,7 +21,7 @@ import javax.ws.rs.core.Response;
  */
 public class CompletionStageRxInvokerImpl implements CompletionStageRxInvoker
 {
-   private final SyncInvoker builder;
+   private final ClientInvocationBuilder builder;
 
    private final ExecutorService executor;
 
@@ -31,7 +32,7 @@ public class CompletionStageRxInvokerImpl implements CompletionStageRxInvoker
 
    public CompletionStageRxInvokerImpl(final SyncInvoker builder, final ExecutorService executor)
    {
-      this.builder = builder;
+      this.builder = (ClientInvocationBuilder)builder;
       this.executor = executor;
    }
 
@@ -54,11 +55,27 @@ public class CompletionStageRxInvokerImpl implements CompletionStageRxInvoker
    {
       if (executor == null)
       {
-         return CompletableFuture.supplyAsync(() -> builder.get(responseType));
+         return CompletableFuture.supplyAsync(() -> {
+            try {
+               return builder.async().get(responseType).get();
+            } catch (InterruptedException e) {
+               throw new RuntimeException(e);
+            } catch (ExecutionException e) {
+               throw new RuntimeException(e);
+            }
+         });
       }
       else
       {
-         return CompletableFuture.supplyAsync(() -> builder.get(responseType), executor);
+         return CompletableFuture.supplyAsync(() -> {
+            try {
+               return builder.async().get(responseType).get();
+            } catch (InterruptedException e) {
+               throw new RuntimeException(e);
+            } catch (ExecutionException e) {
+               throw new RuntimeException(e);
+            }
+         }, executor);
       }
    }
 
